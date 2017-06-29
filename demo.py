@@ -18,8 +18,10 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score
 # To calculate the precision, recall and fscore of the model
 from sklearn.metrics import precision_recall_fscore_support
-# For NN stats, import report util
-from sklearn.metrics import classification_report
+# To simplify cross validation
+from sklearn.model_selection import KFold
+
+from NaiveBayesClassifer import NaiveBayesClassifier
 
 
 def stats_output(test, predict, fitTime, predTime, name):
@@ -27,7 +29,7 @@ def stats_output(test, predict, fitTime, predTime, name):
     type = 0
     precisions, recalls, fscores, _ = precision_recall_fscore_support(test, predict)
     print "**Evaluate performance of algorithm %s**" % name
-    print "accuracy score is %.4f" % accuracy_score(target_test, target_pred, normalize=True)
+    print "accuracy score is %.4f" % accuracy_score(test, predict, normalize=True)
     for (precision, recall, fscore) in zip(precisions, recalls, fscores):
         print ""
         print "precision of class %d is %.4f" % (type, precision)
@@ -39,8 +41,24 @@ def stats_output(test, predict, fitTime, predTime, name):
     print "(2)Prediction stage elapse time is %.5f" % predTime
     print "****************************************\n\n"
 
+
+def apply_classifier(clf, features, target, name):
+    kf = KFold(n_splits = 10)
+    for train_index, test_index in kf.split(features):
+        features_train, features_test = features[train_index], features[test_index]
+        target_train, target_test = target[train_index], target[test_index]
+
+    st = time.time()
+    clf.fit(features_train, target_train)
+    fitTime = time.time() - st
+
+    st = time.time()
+    target_pred = clf.predict(features_test)
+    predTime = time.time() - st
+
+    stats_output(target_test, target_pred, fitTime, predTime, name)
+
 if __name__ == "__main__":
-    # print "this is test"
     adult_df = pd.read_csv('adult.data',
                            header=None, delimiter=' *, *', engine='python')
     adult_df.columns = ['age', 'workclass', 'fnlwgt', 'education', 'education_num',
@@ -89,46 +107,25 @@ if __name__ == "__main__":
                                               'income'], axis=1)
     features = adult_df_rev.values[:, :14]
     target = adult_df_rev.values[:, 14]
-    features_train, features_test, target_train, target_test = train_test_split(features,
-                                                                                target, test_size=0.33, random_state=10)
+
+    # custom bayes start
+    clf = NaiveBayesClassifier()
+    apply_classifier(clf, features, target, "CUSTOM BAYES")
+    # custom bayes end
 
     # sklearn gaussian bayes start
     clf = GaussianNB()
-
-    st = time.time()
-    clf.fit(features_train, target_train)
-    fitTime = time.time() - st
-
-    st = time.time()
-    target_pred = clf.predict(features_test)
-    predTime = time.time() - st
-
-    stats_output(target_test, target_pred, fitTime, predTime, "GAUSSIAN BAYES(SKLEARN)")
+    apply_classifier(clf, features, target, "GAUSSIAN BAYES(SKLEARN)")
     # sklearn gaussian bayes end
 
     # sklearn decision tree start
     clf = DecisionTreeClassifier(criterion = "gini", random_state = 100,
                                  max_depth=3, min_samples_leaf=5)
+    apply_classifier(clf, features, target, "DECISION TREE(SKLEARN)")
+    # sklearn decision tree end
 
-    st = time.time()
-    clf.fit(features_train, target_train)
-    fitTime = time.time() - st
-
-    st = time.time()
-    target_pred = clf.predict(features_test)
-    predTime = time.time() - st
-
-    stats_output(target_test, target_pred, fitTime, predTime, "DECISION TREE(SKLEARN)")
-    # sklearn gaussian bayes end
+    # sklearn neural network start
     clf = MLPClassifier(hidden_layer_sizes=(1,))
-
-    st = time.time()
-    clf.fit(features_train, target_train)
-    fitTime = time.time() - st
-
-    st = time.time()
-    target_pred = clf.predict(features_test)
-    predTime = time.time() - st
-
-    stats_output(target_test, target_pred, fitTime, predTime, "NEURAL NETWORK(SKLEARN)")
+    apply_classifier(clf, features, target, "NEURAL NETWORK(SKLEARN)")
+    # sklearn neural network end
     exit()
